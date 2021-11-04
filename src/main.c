@@ -2,49 +2,63 @@
 #include <string.h>
 #include <mcl/bn_c384_256.h>
 
-int g_err = 0;
+// Degree bound is q
+void poly_eval(int q){
 
-int main()
-{
-	char buf[1600];
-	const char *aStr = "123";
-	const char *bStr = "456";
+	// Pick a random group generator and a trapdoor
+	const char *g1_str = "G1-generator";
+	const char *trapdoor_str = "12321903483802913";
+
+	mclBnG1 g1[q];
+	mclBnG1_hashAndMapTo(&g1[0], g1_str, strlen(g1_str));
+
+	mclBnFr trapdoor;
+	mclBnFr_setStr(&trapdoor, trapdoor_str, strlen(trapdoor_str), 10);
+
+	// Compute: g^(s^i) for i in [0, q)
+	for (int i = 1; i < q; i++) {
+		mclBnG1_mul(&g1[i], &g1[i-1], &trapdoor);
+	}
+
+	// Sample random coefficients for a q-degree bound polynomial
+	mclBnFr a_i[q];
+	for (int i = 1; i < q; i++) {
+		mclBnFr_setByCSPRNG(&a_i[i]);
+	}
+
+	// Compute: x = g^a(s)
+	mclBnG1 result_1, temp_g1;
+	mclBnG1_mul(&result_1, &g1[0], &a_i[0]);
+	for (int i = 1; i < q; i++) {
+		mclBnG1_mul(&temp_g1, &g1[i], &a_i[i]);
+		mclBnG1_add(&result_1, &result_1, &temp_g1);
+	}
+
+
+	// Compute a(s)
+	mclBnFr temp_fr;
+	mclBnFr exponent = trapdoor;
+	mclBnFr sum = a_i[0];
+	for (int i = 1; i < q; i++) {
+		mclBnFr_mul(&temp_fr, &exponent, &a_i[i]);
+		mclBnFr_mul(&exponent, &exponent, &trapdoor);
+		mclBnFr_add(&sum, &sum, &temp_fr);
+	}
+
+	mclBnG1 result_2;
+	mclBnG1_mul(&result_2, &g1[0], &sum);
+
+	printf("IsEqual: %d\n", mclBnG1_isEqual(&result_1, &result_2));
+}
+
+int main(){
+
 	int ret = mclBn_init(MCL_BLS12_381, MCLBN_COMPILED_TIME_VAR);
 	if (ret != 0) {
 		printf("err ret=%d\n", ret);
 		return 1;
 	}
-	mclBnFr a, b, ab;
-	mclBnG1 P, aP;
-	mclBnG2 Q, bQ;
-	mclBnGT e, e1, e2;
-	mclBnFr_setStr(&a, aStr, strlen(aStr), 10);
-	mclBnFr_setStr(&b, bStr, strlen(bStr), 10);
-	mclBnFr_mul(&ab, &a, &b);
-	mclBnFr_getStr(buf, sizeof(buf), &ab, 10);
-	printf("%s x %s = %s\n", aStr, bStr, buf);
-	mclBnFr_sub(&a, &a, &b);
-	mclBnFr_getStr(buf, sizeof(buf), &a, 10);
-	printf("%s - %s = %s\n", aStr, bStr, buf);
 
-	printf("P = %s\n", buf);
-	printf("Q = %s\n", buf);
-
-	mclBnG1_mul(&aP, &P, &a);
-	mclBnG2_mul(&bQ, &Q, &b);
-
-	mclBn_pairing(&e, &P, &Q);
-	printf("e = %s\n", buf);
-	mclBnGT_pow(&e1, &e, &a);
-	mclBn_pairing(&e2, &aP, &Q);
-
-	mclBnGT_pow(&e1, &e, &b);
-	mclBn_pairing(&e2, &P, &bQ);
-	if (g_err) {
-		printf("err %d\n", g_err);
-		return 1;
-	} else {
-		printf("no err\n");
-		return 0;
-	}
+	poly_eval(1024);
+	return 0;
 }
