@@ -50,12 +50,11 @@ void poly_eval(long int q) {
         mclBnFr_mul(&exponent, &exponent, &trapdoor);
         mclBnFr_add(&sum, &sum, &temp_fr);
     }
+    mclBnG1 result_2;
+    mclBnG1_mul(&result_2, &g1[0], &sum);
     t = clock() - t;
     time_taken = ((double)t)/CLOCKS_PER_SEC;
     printf("Using trapdoor: %f seconds\n", time_taken);
-
-    mclBnG1 result_2;
-    mclBnG1_mul(&result_2, &g1[0], &sum);
 }
 
 int main() {
