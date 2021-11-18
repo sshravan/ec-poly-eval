@@ -1,9 +1,10 @@
 #include <mcl/bn_c384_256.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 // Degree bound is q
-void poly_eval(int q) {
+void poly_eval(long int q) {
     // Pick a random group generator and a trapdoor
     const char *g1_str = "G1-generator";
     const char *trapdoor_str = "12321903483802913";
@@ -25,6 +26,9 @@ void poly_eval(int q) {
         mclBnFr_setByCSPRNG(&a_i[i]);
     }
 
+    clock_t t;
+    double time_taken = 0;
+    t = clock();
     // Compute: x = g^a(s)
     mclBnG1 result_1, temp_g1;
     mclBnG1_mul(&result_1, &g1[0], &a_i[0]);
@@ -32,21 +36,26 @@ void poly_eval(int q) {
         mclBnG1_mul(&temp_g1, &g1[i], &a_i[i]);
         mclBnG1_add(&result_1, &result_1, &temp_g1);
     }
+    t = clock() - t;
+    time_taken = ((double)t)/CLOCKS_PER_SEC;
+    printf("Using CRS: %f seconds\n", time_taken);
 
     // Compute a(s)
     mclBnFr temp_fr;
     mclBnFr exponent = trapdoor;
     mclBnFr sum = a_i[0];
+    t = clock();
     for (int i = 1; i < q; i++) {
         mclBnFr_mul(&temp_fr, &exponent, &a_i[i]);
         mclBnFr_mul(&exponent, &exponent, &trapdoor);
         mclBnFr_add(&sum, &sum, &temp_fr);
     }
+    t = clock() - t;
+    time_taken = ((double)t)/CLOCKS_PER_SEC;
+    printf("Using trapdoor: %f seconds\n", time_taken);
 
     mclBnG1 result_2;
     mclBnG1_mul(&result_2, &g1[0], &sum);
-
-    printf("IsEqual: %d\n", mclBnG1_isEqual(&result_1, &result_2));
 }
 
 int main() {
